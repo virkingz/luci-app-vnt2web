@@ -978,6 +978,39 @@ def test_frontend_reorder():
     if "admin/vpn/vnt2web" in menu:
         check("菜单标题为 VNT2WEB", menu["admin/vpn/vnt2web"].get("title"), "VNT2WEB")
 
+    # ---- 连通性探测：地址须与真实下载链路一致 ----
+    # 曾经的 bug：net_test 探测 api.github.com，而检查更新/下载走 github.com。
+    # 结果「检查更新」成功、连通性却报失败（api.github.com 在部分网络下不通），
+    # 结论误导。两者必须探测同一条链路。
+    rpcd_src = open(os.path.join(ROOT, "root/usr/libexec/rpcd/vnt2web"),
+                    encoding="utf-8").read()
+    # 只看 m_net_test 函数体（剥掉注释行）
+    ntp = rpcd_src[rpcd_src.index("m_net_test()"):]
+    ntp = ntp[:ntp.index("\n}\n")]
+    ntp_code = re.sub(r"^\s*#.*$", "", ntp, flags=re.M)
+    check_true("连通性探测不用 api.github.com",
+               "api.github.com" not in ntp_code, "该域名在部分网络下不通")
+    check_true("连通性探测走 release 附件（与下载同链路）",
+               "latest/download/latest.json" in ntp_code, "")
+    # 库里的版本查询也用同一地址
+    check_true("版本查询用同一地址",
+               "releases/latest/download/latest.json" in
+               open(os.path.join(ROOT, "root/usr/share/vnt2web/vnt.sh"),
+                    encoding="utf-8").read(), "")
+    # 失败时应给出可操作建议
+    check_true("失败提示含镜像前缀建议", "镜像前缀" in ntp, "")
+    check_true("不支持代理的客户端有专门提示",
+               "不支持 SOCKS 代理" in ntp, "")
+
+    # ---- 「最新版本」这一行必须被更新 ----
+    # 曾经的 bug：handleCheck 只改按钮文字与 ST.latest，从没写 #vnt-latest，
+    # 于是该行永远停在「未检查」。
+    hc = js[js.index("handleCheck: function"):]
+    hc = hc[:hc.index("\n\t},")]
+    check_true("handleCheck 会写 #vnt-latest", "vnt-latest" in hc, "")
+    check_true("查询失败时该行显示失败",
+               "查询失败" in hc, "")
+
     # ---- 「测试连通性」按钮不用 form.Button（会跑到最左并独占一行）----
     # ---- 「测试连通性」按钮：位置在「核心更新」标签的按钮行里 ----
     check_true("测试按钮不用 form.Button",

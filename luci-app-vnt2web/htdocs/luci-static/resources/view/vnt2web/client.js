@@ -409,10 +409,14 @@ return view.extend({
 		msg.appendChild(badge('正在查询最新版本…', ''));
 		return callCheck().then(function (r) {
 			msg.innerHTML = '';
+			// 「最新版本」那一行也要跟着更新 —— 否则永远停在「未检查」
+			const latestEl = document.getElementById('vnt-latest');
 			if (!r.ok) {
+				if (latestEl) latestEl.textContent = '查询失败';
 				msg.appendChild(badge(r.msg, 'bad'));
 				return;
 			}
+			if (latestEl) latestEl.textContent = 'v' + (r.latest || '未知');
 			msg.appendChild(badge(r.tip, r.action === 'none' ? 'ok' : ''));
 			const btn = document.getElementById('vnt-btn-update');
 			if (btn) {

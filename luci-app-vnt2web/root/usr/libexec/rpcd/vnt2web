@@ -343,27 +343,62 @@ m_diag() {
 }
 
 m_net_test() {
-	local px out rc
-
+	local px out rc t0 t1 sz
+	# 探测顺序与真实下载路径一致（见 vnt_latest_version / vnt_install_core）：
+	#   1) latest.json —— 官方 release 附件，走 github.com（下载链路本身）
+	#   2) releases/latest 的可达性 —— 302 到 tag 页
+	# 特意**不**用 api.github.com：那个域名在部分网络下不通，
+	# 而 github.com 的 release 下载却正常，用它探测会给出误导性结论。
 	px="$(vnt_get_proxy)"
 	if [ -n "$px" ] && ! vnt_have_curl; then
 		json_result 0 '已配置代理，但系统没有 curl。请先安装 curl，否则无法走代理下载。'
 		return 0
 	fi
 
-	local f t0 t1 sz
+	local cli
+	cli="$(vnt_http_client)" || {
+		json_result 0 '系统缺少 HTTP 客户端（需 curl / uclient-fetch / wget 之一）。'
+		return 0
+	}
+
+	local f
 	f="/tmp/.vnt2web_probe.$$"
+
+	# ---- 1) release 附件（与「检查更新」同一地址，最能代表真实下载能力）----
 	t0="$(date +%s)"
-	if vnt_fetch "$(vnt_url https://api.github.com/repos/vnt-dev/vnt/releases/latest)" "$f" 25 \
-		&& [ -s "$f" ]; then
+	if vnt_fetch "$(vnt_url "https://github.com/${VNT_REPO}/releases/latest/download/latest.json")" \
+		"$f" 25 && [ -s "$f" ]; then
 		t1="$(date +%s)"
 		sz="$(wc -c <"$f" | tr -d ' ')"
 		rm -f "$f"
-		json_result 1 "连通正常，耗时约 $((t1 - t0)) 秒（收到 ${sz} 字节）"
+		json_result 1 "连通正常：已取到版本清单（${sz} 字节，约 $((t1 - t0)) 秒）"
 		return 0
 	fi
 	rm -f "$f"
-	json_result 0 '无法访问 GitHub。请检查网络，或配置镜像前缀 / 网络代理。'
+
+	# ---- 2) 退一步只测 releases/latest 是否可达 ----
+	if vnt_have_curl; then
+		if [ -n "$px" ]; then
+			rc="$(curl -sIL --max-time 20 --proxy "$px" --insecure -o /dev/null \
+				-w '%{http_code}' "$(vnt_url "https://github.com/${VNT_REPO}/releases/latest")" 2>/dev/null)"
+		else
+			rc="$(curl -sIL --max-time 20 --insecure -o /dev/null \
+				-w '%{http_code}' "$(vnt_url "https://github.com/${VNT_REPO}/releases/latest")" 2>/dev/null)"
+		fi
+		if [ -n "$rc" ] && [ "$rc" != "000" ]; then
+			json_result 1 "GitHub 可达（HTTP $rc），但版本清单下载失败。可稍后重试，或配置镜像前缀。"
+			return 0
+		fi
+	fi
+
+	# ---- 失败：给出可操作的建议 ----
+	if [ -n "$px" ]; then
+		json_result 0 "经代理仍无法访问 GitHub（$cli）。请确认代理地址可用，或改用镜像前缀。"
+	elif [ "$cli" = "curl" ]; then
+		json_result 0 '无法访问 GitHub。可配置镜像前缀（如 https://ghfast.top）或网络代理后重试。'
+	else
+		json_result 0 "无法访问 GitHub。当前用的是 $cli，不支持 SOCKS 代理；如需走代理请先安装 curl。"
+	fi
 }
 
 # ---------------------------------------------------------------------------
