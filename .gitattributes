@@ -1,0 +1,37 @@
+# 统一换行符：仓库内一律使用 LF
+#
+# 这一点对 OpenWrt 插件是**必须**的，不是可选项：
+# 本项目的 init.d 脚本、uci-defaults 脚本、shell 库都是无后缀的 Linux 脚本，
+# 一旦被转成 CRLF，装到路由器上会因 shebang 变成 `#!/bin/sh\r` 而无法执行。
+* text=auto eol=lf
+
+# 文本文件显式声明
+*.sh    text eol=lf
+*.py    text eol=lf
+*.js    text eol=lf
+*.css   text eol=lf
+*.html  text eol=lf
+*.json  text eol=lf
+*.md    text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+
+# 无后缀的脚本与配置（OpenWrt 惯例）—— 必须 LF
+files/etc/init.d/*           text eol=lf
+files/etc/uci-defaults/*     text eol=lf
+files/etc/config/*           text eol=lf
+files/usr/libexec/rpcd/*     text eol=lf
+files/usr/share/vnt2web/*    text eol=lf
+files/usr/share/luci/menu.d/* text eol=lf
+files/usr/share/rpcd/acl.d/* text eol=lf
+Makefile                     text eol=lf
+
+# 二进制文件不做任何转换
+*.ipk   binary
+*.apk   binary
+*.png   binary
+*.PNG   binary
+*.jpg   binary
+*.gz    binary
+*.tgz   binary
+*.zip   binary

@@ -1,0 +1,21 @@
+# 构建产物
+build/
+dist/
+*.ipk
+*.apk
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# 编辑器
+.vscode/
+.idea/
+*.swp
+*~
+
+# 系统
+.DS_Store
+Thumbs.db
