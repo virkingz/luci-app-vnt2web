@@ -7,7 +7,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-vnt2web
-PKG_VERSION:=1.0.1
+PKG_VERSION:=1.0.2
 PKG_RELEASE:=1
 
 PKG_LICENSE:=MIT
@@ -43,12 +43,41 @@ chmod 0755 \
 exit 0
 endef
 
-# 卸载时清理运行期数据（核心二进制与日志；配置由 conffiles 机制处理）
+# 卸载时清理：把 /etc 下的数据目录移到 /tmp（软删除）。
+# /tmp 是内存盘，重启即清 —— 既不留残留，也给「误卸载」留一次后悔机会。
+#
+# 注意必须按 $1 区分场景：opkg 升级时也会调用 postrm（参数 upgrade），
+# 此时绝不能搬走目录，否则升级瞬间丢配置与核心。
 define Package/$(PKG_NAME)/postrm
 #!/bin/sh
-[ -f "$${IPKG_INSTROOT}/etc/init.d/vnt2web" ] || {
-	rm -rf /etc/vnt2web /tmp/vnt2web
-}
+[ -n "$${IPKG_INSTROOT}" ] && exit 0
+
+# 升级/重装：保留一切
+case "$$1" in
+	upgrade) exit 0 ;;
+esac
+
+# 停服务并清运行期数据（/tmp 下的，重启本就会清）
+if [ -x /etc/init.d/vnt2web ]; then
+	/etc/init.d/vnt2web stop >/dev/null 2>&1
+	/etc/init.d/vnt2web disable >/dev/null 2>&1
+fi
+rm -rf /tmp/vnt2web 2>/dev/null
+
+# 把 /etc 下的数据目录搬到 /tmp（软删除，重启即消失，避免 Flash 残留）
+# 用时间戳后缀，防止同一会话内重复卸载时互相覆盖。
+if [ -d /etc/vnt2web ]; then
+	_stash="/tmp/vnt2web-removed-$$$$"
+	mv -f /etc/vnt2web "$$_stash" 2>/dev/null || rm -rf /etc/vnt2web 2>/dev/null
+	if [ -d "$$_stash" ]; then
+		echo "配置与核心已移至 $$_stash（重启后自动清除）。"
+		echo "如需立刻彻底清除：rm -rf $$_stash"
+	fi
+fi
+
+rm -f /tmp/luci-indexcache* 2>/dev/null
+rm -rf /tmp/luci-modulecache/ 2>/dev/null
+/etc/init.d/rpcd restart >/dev/null 2>&1
 exit 0
 endef
 

@@ -342,6 +342,48 @@ def test_ipk():
     check("postinst 权限", ct.getmember("./postinst").mode, 0o755)
     check("postrm 权限", ct.getmember("./postrm").mode, 0o755)
 
+    # ---- postrm 行为：卸载软删除，但升级必须保留 ----
+    # 这是易错点：opkg 升级时也调 postrm（传 upgrade），若无条件搬走 /etc/vnt2web，
+    # 升级瞬间丢配置与核心。
+    postrm_src = ct.extractfile("./postrm").read().decode()
+    check_true("postrm 区分 upgrade（升级时保留数据）",
+               "upgrade)" in postrm_src, "否则升级会丢配置")
+    check_true("postrm 把数据移到 /tmp（软删除）",
+               "/tmp/vnt2web-removed-" in postrm_src, "")
+    # mv 失败（如跨设备）时才退化为直接删除，这是有意的兜底；
+    # 但不能无条件 rm —— 那样就不是软删除了。
+    check_true("rm 仅作为 mv 失败的兜底",
+               "|| rm -rf /etc/vnt2web" in postrm_src, "")
+    # 实测行为：真跑一遍 postrm，验升级保留、卸载搬走
+    postrm_py = os.path.join(ROOT, "scripts/build-ipk.py")
+    import re as _re
+    _src = open(postrm_py, encoding="utf-8").read()
+    _m = _re.search(r'POSTRM = r"""(.*?)"""', _src, _re.S)
+    if _m:
+        import subprocess as _sp
+        import tempfile as _tf
+        for arg, expect_kept in [("upgrade", True), ("remove", False)]:
+            with _tf.TemporaryDirectory() as td:
+                # 关键：临时目录在 Windows 下是反斜杠路径，直接塞进 sh 会被
+                # 当成转义序列（\U \v \T ...）吃掉反斜杠，导致 [ -d ] 判断失败。
+                # 必须转成正斜杠。
+                sl = td.replace("\\", "/")
+                os.makedirs(os.path.join(td, "etc/vnt2web/config"))
+                open(os.path.join(td, "etc/vnt2web/token"), "w").write("tok")
+                sc = _m.group(1)
+                for a, b in [("/etc/vnt2web", sl + "/etc/vnt2web"),
+                             ("/tmp/vnt2web", sl + "/tmp/vnt2web"),
+                             ("/etc/init.d/rpcd", "true"),
+                             ("/etc/init.d/vnt2web", "true"),
+                             ("/tmp/luci-indexcache", sl + "/tmp/luci-indexcache"),
+                             ("/tmp/luci-modulecache", sl + "/tmp/luci-modulecache")]:
+                    sc = sc.replace(a, b)
+                _sp.run(["sh", "-c", sc, "--", arg], capture_output=True, timeout=20)
+                kept = os.path.isdir(os.path.join(td, "etc/vnt2web"))
+                label = "升级" if arg == "upgrade" else "卸载"
+                check_true("postrm %s 时数据%s" % (label, "保留" if expect_kept else "搬走"),
+                           kept == expect_kept, "")
+
     # ---- data.tar.gz ----
     dt = tarfile.open(fileobj=io.BytesIO(outer.extractfile("./data.tar.gz").read()))
     members = dt.getmembers()

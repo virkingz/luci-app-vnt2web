@@ -80,17 +80,37 @@ exit 0
 
 POSTRM = r"""
 [ -n "${IPKG_INSTROOT}" ] && exit 0
+
+# opkg 升级时也会调用 postrm（参数 upgrade）—— 此时绝不能动数据目录，
+# 否则升级瞬间丢配置与核心，违背「升级不丢配置」。
+case "$1" in
+	upgrade) exit 0 ;;
+esac
+
 # 卸载时停服务
 if [ -x /etc/init.d/vnt2web ]; then
 	/etc/init.d/vnt2web stop >/dev/null 2>&1
 	/etc/init.d/vnt2web disable >/dev/null 2>&1
 fi
-# 清理日志与运行缓存（/tmp 下的，重启本就会清）
+
+# 清运行期数据（/tmp 下的，重启本就会清）
 rm -rf /tmp/vnt2web 2>/dev/null
-# 注意：不删除 /etc/vnt2web —— 里面的 token 与用户配置应保留，
-# 以便重装后延续；如需彻底清除请手动 rm -rf /etc/vnt2web
-printf '%s\n' "提示：配置与令牌保留在 /etc/vnt2web（如需清除请手动删除该目录）"
+
+# 把 /etc 下的数据目录搬到 /tmp —— 软删除：既不在 Flash 留残留，
+# 又给「误卸载」留一次后悔机会（重启后随内存盘消失）。
+# 加时间戳后缀，避免同一会话内重复卸载互相覆盖。
+if [ -d /etc/vnt2web ]; then
+	_stash="/tmp/vnt2web-removed-$$"
+	mv -f /etc/vnt2web "$_stash" 2>/dev/null || rm -rf /etc/vnt2web 2>/dev/null
+	if [ -d "$_stash" ]; then
+		echo "配置与核心已移至 $_stash（重启后自动清除）。"
+		echo "如需立刻彻底清除：rm -rf $_stash"
+	fi
+fi
+
 rm -f /tmp/luci-indexcache* 2>/dev/null
+rm -rf /tmp/luci-modulecache/ 2>/dev/null
+
 # 让 rpcd 摘掉已删除的 ubus 对象
 /etc/init.d/rpcd restart >/dev/null 2>&1
 exit 0

@@ -2,6 +2,27 @@
 
 本项目遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.0.2] - 2026-11-17
+
+### 变更
+
+- **卸载改为「软删除」**：`postrm` 不再直接 `rm -rf /etc/vnt2web`，而是把该目录
+  **移到 `/tmp/vnt2web-removed-<pid>`**。
+
+  `/tmp` 是内存盘，**重启后自动清空** —— 既不在 Flash 上留残留，
+  又给误卸载留了一次反悔机会（`mv` 回去即可恢复）。想立刻清除就
+  `rm -rf /tmp/vnt2web-removed-*`。
+
+  **关键：必须按 `$1` 区分场景。** opkg 升级覆盖安装时**也会调用 postrm**
+  （参数为 `upgrade`），此时若无条件搬走目录，升级瞬间就会丢配置与核心，
+  违背「升级不丢配置」。因此 `case "$1" in upgrade) exit 0` 先行放行。
+
+- **README 新增「支持的固件版本」**：明确要求 **OpenWrt 22.03+ 的 JS 版 LuCI**。
+  经典 Lua 版 LuCI（部分 LEDE / 老式定制固件）的菜单来自
+  `/usr/lib/lua/luci/controller/*.lua`，**不读取本插件的 `menu.d` JSON**，
+  因此装好后菜单不出现。README 给出了自查命令与替代方案。
+  排障表也新增了「安装后菜单找不到」一行。
+
 ## [1.0.1] - 2026-11-17
 
 ### 修复

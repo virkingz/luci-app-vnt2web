@@ -12,6 +12,37 @@
 
 > 与封装 `vnt2_cli` 的版本相比：`vnt2_web` 自带网页界面，因此**不需要**在 LuCI 里逐项配置组网参数（组网编号、服务端、密码、点对网等），那些都在面板里填。LuCI 这边只留运行所需的几项。
 
+## 支持的固件版本
+
+本插件的界面是**现代 LuCI（JS 视图）**实现，因此有以下要求：
+
+| 项目 | 要求 |
+|------|------|
+| OpenWrt | **22.03 及以上**（23.05 / 24.10 / SNAPSHOT 均可） |
+| LuCI | 需为 **JS 版**（即存在 `/www/luci-static/resources/view/` 目录） |
+| 依赖包 | `luci-base`、`rpcd`、`kmod-tun`、`unzip` |
+
+> 从 OpenWrt 22.03 起，LuCI 逐步从 Lua 迁移到「ubus + ucode + 客户端 JS」。
+> 本插件用的是新架构：菜单声明在 `/usr/share/luci/menu.d/*.json`，
+> 页面代码是 `/www/luci-static/resources/view/**/*.js`。
+
+**已知不兼容**：**经典 Lua 版 LuCI 的固件**（部分 LEDE / 老式定制固件）。
+这类固件的菜单来自 `/usr/lib/lua/luci/controller/*.lua`，**不会读取本插件的
+`menu.d` JSON**，因此装好后菜单不出现（其余文件都已装好，仅界面不可见）。
+
+**如何判断自己的固件是哪种？** 在路由器上执行：
+
+```sh
+# 有输出 = JS 版 LuCI（支持本插件）
+ls /www/luci-static/resources/view/ 2>/dev/null | head -3
+
+# 有输出 = Lua 版 LuCI（不支持本插件）
+ls /usr/lib/lua/luci/controller/ 2>/dev/null | head -3
+```
+
+如果确认是 Lua 版固件，可改用手册式 Lua 实现的同类插件，
+或自行将本插件的前端改写为 Lua CBI（依赖 `luci-compat` + `luci-lua-runtime`）。
+
 ## 界面
 
 入口在 LuCI 的 **VPN → VNT2WEB**。页面顶部是状态条（核心版本 / 运行状态 / 面板地址），
@@ -269,6 +300,7 @@ OpenWrt 设备多为 NOR/NAND Flash，写入寿命有限。日志高频追加会
 
 | 现象 | 处理 |
 |------|------|
+| **安装后在菜单里找不到** | 见[「支持的固件版本」](#支持的固件版本) —— 多半是 Lua 版 LuCI；先清缓存 `rm -f /tmp/luci-indexcache* && /etc/init.d/rpcd restart` 再强刷 |
 | 无法下载核心 | 「访问设置」配镜像前缀或代理，回「核心更新」点「测试连通性」验证；确认已装 `unzip` |
 | 启动失败 | 看「日志」标签的 `main.log`（启动失败的原因与核心日志尾部都会记在这里） |
 | 面板空白/打不开 | 确认核心在运行且「端口已监听」；用「在新窗口打开」直连排查 |
@@ -277,6 +309,29 @@ OpenWrt 设备多为 NOR/NAND Flash，写入寿命有限。日志高频追加会
 | 令牌忘了 | 在「访问设置」重新填一个（≥16 位）并保存；或清空后保存，让核心重新生成 |
 | 显示「已停止」但面板能开 | 状态检测依次看 PID 文件、procd 实例状态、进程路径；若都不中，`ubus call service list '{"name":"vnt2web"}'` 看 procd 是否认为在跑 |
 | 更新后组网不通 | 更新失败会自动回滚，备份在 `/var/run/vnt2web/vnt2_web.bak` |
+
+## 卸载
+
+```sh
+opkg remove luci-app-vnt2web
+```
+
+卸载时会**停服务、清运行期数据**，并把 `/etc/vnt2web`（令牌、核心、组网配置）
+**移到 `/tmp/vnt2web-removed-<pid>`**。
+
+这是**软删除**：`/tmp` 是内存盘，**重启后自动清空**，
+所以既不会在 Flash 上留残留，又给「误卸载」留了一次反悔机会 ——
+若想立刻找回，把该目录移回 `/etc/vnt2web` 即可：
+
+```sh
+ls -d /tmp/vnt2web-removed-*      # 看暂存目录
+mv /tmp/vnt2web-removed-* /etc/vnt2web   # 反悔，恢复
+```
+
+想立即彻底清除：`rm -rf /tmp/vnt2web-removed-*`
+
+> 升级（`opkg install` 覆盖安装）**不会**触发上述清理 ——
+> postrm 会识别 `upgrade` 参数并直接返回，配置与核心完整保留。
 
 ## 上游
 
