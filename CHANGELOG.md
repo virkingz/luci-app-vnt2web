@@ -11,6 +11,18 @@ OpenWrt 的 LuCI 应用：设置访问令牌与端口、托管核心进程、在
 
 **这是一个「壳」**：不含任何 vnt 二进制，**组网的添加与启停全部交给 vnt2_web 自带网页**。
 
+### 仓库结构（标准 OpenWrt feed）
+
+仓库根即 feed，包本体在 `luci-app-vnt2web/` 子目录下，采用 **OpenWrt 标准目录名**：
+
+- `root/` → 原样安装到设备根（`luci.mk` 自动处理）
+- `htdocs/` → 安装到 `/www`
+- `root/etc/uci-defaults/` → 安装后自动执行
+- Makefile 用 `include $(TOPDIR)/feeds/luci/luci.mk` + `LUCI_TITLE` /
+  `LUCI_DEPENDS` / `LUCI_PKGARCH` 元数据，**无需手写 install 段**
+
+三种接入方式：feed 引入、拷包目录进 buildroot、免 SDK 自建 ipk。
+
 ### 功能
 
 - **核心在线更新**：从 GitHub Releases 按架构拉取，支持镜像前缀与 SOCKS/HTTP 代理

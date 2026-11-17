@@ -12,6 +12,27 @@
 
 > 与封装 `vnt2_cli` 的版本相比：`vnt2_web` 自带网页界面，因此**不需要**在 LuCI 里逐项配置组网参数（组网编号、服务端、密码、点对网等），那些都在面板里填。LuCI 这边只留运行所需的几项。
 
+## 界面
+
+入口在 LuCI 的 **VPN → VNT2WEB**。页面顶部是状态条（核心版本 / 运行状态 / 面板地址），
+下方四个标签：
+
+**核心更新** —— 版本信息、检查更新、下载/更新核心、测试连通性
+
+![核心更新](docs/screenshots/01-core-update.png)
+
+**访问设置** —— 启用服务、监听端口、访问令牌、存储路径、更新源与代理
+
+![访问设置](docs/screenshots/02-access-settings.png)
+
+**组网面板** —— `vnt2_web` 原生界面内嵌，令牌自动注入，打开即用
+
+![组网面板](docs/screenshots/03-panel.png)
+
+**日志** —— 核心 / 服务 / 更新日志查看，以及逐项自检
+
+![日志与自检](docs/screenshots/04-logs.png)
+
 ## 特性
 
 - **配置极简**：只需端口 + 访问令牌，其余在面板里配
@@ -60,18 +81,24 @@ opkg install kmod-tun
 opkg install --force-depends /tmp/luci-app-vnt2web_1.0.0-1_all.ipk
 ```
 
-### 方式二：用 SDK 编译
+### 方式二：接入 OpenWrt 编译
+
+见下方[「接入 OpenWrt 编译」](#接入-openwrt-编译)。简言之：
 
 ```sh
-cp -a luci-app-vnt2web package/
+cp -a luci-app-vnt2web/luci-app-vnt2web package/
 make package/luci-app-vnt2web/compile V=s
 ```
 
-### 方式三：免 SDK 自行打包
+### 方式三：免 SDK 自行打包（不搭环境，最快）
 
 ```sh
-python scripts/build-ipk.py          # 产出 dist/luci-app-vnt2web_<版本>-1_all.ipk
+cd luci-app-vnt2web
+python scripts/build-ipk.py   # 产出 dist/luci-app-vnt2web_<版本>-1_all.ipk
 ```
+
+> 纯 Python、无需 SDK 与 `ar`/`tar`，Windows 上也能出包。
+> `PKGARCH=all`：一份包通吃全架构（核心在运行时按架构下载）。
 
 ## 使用（三步）
 
@@ -152,22 +179,59 @@ LuCI → **VPN → VNT2WEB** → 「检查更新」，确认可下载后点「�
 
 ## 目录结构
 
+仓库根是一个 **OpenWrt feed**，包本体在 `luci-app-vnt2web/` 子目录下：
+
 ```
-luci-app-vnt2web/
-├── Makefile                          # OpenWrt 包定义
-├── files/                            # 原样安装到设备 /
-│   ├── etc/
-│   │   ├── config/vnt2web            # UCI 默认配置（conffile）
-│   │   ├── init.d/vnt2web            # procd 服务
-│   │   └── uci-defaults/95-vnt2web   # 安装初始化（生成令牌）
-│   ├── usr/libexec/rpcd/vnt2web      # LuCI 后端（ubus 对象 vnt2web）
-│   ├── usr/share/rpcd/acl.d/         # 权限声明
-│   ├── usr/share/luci/menu.d/        # 菜单注册
-│   └── usr/share/vnt2web/
-│       ├── vnt.sh                    # 基础层：路径、架构映射、HTTP、版本、令牌
-│       └── vnt-core.sh               # 核心层：安装/回滚、进程、防火墙
-└── htdocs/luci-static/resources/view/vnt2web/client.js   # 前端界面
+luci-app-vnt2web/                     # 仓库根 = feed
+├── .github/workflows/
+│   ├── build.yml                     # 免 SDK 自建 ipk + 测试（快）
+│   └── build-sdk.yml                 # SDK 矩阵真实编译（可选）
+├── docs/screenshots/                 # 界面截图
+├── LICENSE                           # MIT
+└── luci-app-vnt2web/                 # ← 包本体
+    ├── Makefile                      # OpenWrt 包定义（用 feeds/luci/luci.mk）
+    ├── root/                         # 原样安装到设备 /
+    │   ├── etc/
+    │   │   ├── config/vnt2web        # UCI 默认配置（conffile）
+    │   │   ├── init.d/vnt2web        # procd 服务
+    │   │   └── uci-defaults/95-vnt2web   # 安装初始化
+    │   ├── usr/libexec/rpcd/vnt2web  # LuCI 后端（ubus 对象 vnt2web）
+    │   ├── usr/share/rpcd/acl.d/     # 权限声明
+    │   ├── usr/share/luci/menu.d/    # 菜单注册
+    │   └── usr/share/vnt2web/
+    │       ├── vnt.sh                # 基础层：路径、架构映射、HTTP、版本、令牌
+    │       └── vnt-core.sh           # 核心层：安装/回滚、进程、防火墙
+    ├── htdocs/luci-static/resources/view/vnt2web/client.js   # 前端界面
+    └── scripts/                      # 免 SDK 打包与测试（不参与 OpenWrt 编译）
 ```
+
+> `root/` 与 `htdocs/` 是 OpenWrt 包的**标准目录名**，`luci.mk` 会自动处理：
+> `root/` 原样装到设备根、`htdocs/` 装到 `/www`、`root/etc/uci-defaults/` 自动执行。
+> 因此 Makefile 里**不需要手写 install 段**。
+
+## 接入 OpenWrt 编译
+
+**方式一：作为 feed 加入**（推荐，便于跟随上游更新）
+
+```sh
+# 在 OpenWrt buildroot 根目录
+echo 'src-git vnt2web https://github.com/virkingz/luci-app-vnt2web.git' \
+  >> feeds.conf.default
+./scripts/feeds update vnt2web
+./scripts/feeds install luci-app-vnt2web
+make menuconfig      # LuCI → Applications → luci-app-vnt2web
+make package/luci-app-vnt2web/compile V=s
+```
+
+**方式二：直接拷包目录**
+
+```sh
+cp -a luci-app-vnt2web/luci-app-vnt2web package/
+make package/luci-app-vnt2web/compile V=s
+```
+
+两种方式产出的 ipk 与仓库 Release 里的等价。
+若只想快速拿包、不搭 SDK，用下面的免 SDK 打包即可。
 
 ## 运行时数据与存储路径
 

@@ -11,8 +11,12 @@ on:
 permissions:
   contents: write
 
+env:
+  # 包子目录：仓库根是 feed，包本体在这个目录下
+  PKGDIR: luci-app-vnt2web
+
 jobs:
-  # 语法与逻辑检查 + 打包自检。全部不联网。
+  # 语法与逻辑检查 + 免 SDK 打包 + 测试。全部不联网。
   test:
     runs-on: ubuntu-latest
     steps:
@@ -29,6 +33,7 @@ jobs:
 
       - name: shell 语法检查
         run: |
+          cd "$PKGDIR"
           for f in files/usr/share/vnt2web/vnt.sh files/usr/share/vnt2web/vnt-core.sh \
                    files/etc/init.d/vnt2web files/etc/uci-defaults/95-vnt2web \
                    scripts/build-ipk.sh; do
@@ -39,22 +44,27 @@ jobs:
       - name: shellcheck（仅警告，不阻断）
         continue-on-error: true
         run: |
+          cd "$PKGDIR"
           shellcheck -s sh -e SC3043,SC2039 files/usr/share/vnt2web/*.sh \
             files/etc/init.d/vnt2web files/etc/uci-defaults/95-vnt2web || true
 
-      - name: 打包
-        run: python scripts/build-ipk.py
+      - name: 打包（免 SDK 自建 ipk）
+        run: |
+          cd "$PKGDIR"
+          python scripts/build-ipk.py
 
       - name: 运行测试
-        run: python scripts/test.py
+        run: |
+          cd "$PKGDIR"
+          python scripts/test.py
 
       - name: 上传产物
         uses: actions/upload-artifact@v4
         with:
           name: luci-app-vnt2web-ipk
-          path: dist/*.ipk
+          path: ${{ env.PKGDIR }}/dist/*.ipk
 
-  # 打 tag 时创建 Release 并附上 ipk
+  # 打 tag 时创建 Release 并附上免 SDK 产出的 ipk（PKGARCH=all，一包通吃）
   release:
     needs: test
     if: startsWith(github.ref, 'refs/tags/v')
@@ -67,15 +77,17 @@ jobs:
           python-version: '3.x'
 
       - name: 打包
-        run: python scripts/build-ipk.py
+        run: |
+          cd "$PKGDIR"
+          python scripts/build-ipk.py
 
       - name: 校验产物
         run: |
-          ls -l dist/
-          test -n "$(ls dist/*.ipk 2>/dev/null)" || { echo "未产出 ipk"; exit 1; }
+          ls -l "$PKGDIR/dist/"
+          test -n "$(ls $PKGDIR/dist/*.ipk 2>/dev/null)" || { echo "未产出 ipk"; exit 1; }
 
       - name: 创建 Release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/*.ipk
+          files: ${{ env.PKGDIR }}/dist/*.ipk
           generate_release_notes: true

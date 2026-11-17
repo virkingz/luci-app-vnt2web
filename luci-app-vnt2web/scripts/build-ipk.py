@@ -21,18 +21,20 @@ sys.path.insert(0, HERE)
 
 import ipk  # noqa: E402
 
-# 安装清单：源路径(相对项目根) -> 安装到设备的目标路径
+# 安装清单：源路径(相对包目录) -> 安装到设备的目标路径
+#   root/  —— 与 OpenWrt 包约定一致（luci.mk / package.mk 都认这个目录名）
+#   htdocs/ —— LuCI 静态资源，安装到 /www
 INSTALL_MAP = [
-    ("files/etc/init.d/vnt2web", "/etc/init.d/vnt2web", 0o755),
-    ("files/etc/config/vnt2web", "/etc/config/vnt2web", 0o644),
-    ("files/etc/uci-defaults/95-vnt2web", "/etc/uci-defaults/95-vnt2web", 0o755),
-    ("files/usr/share/vnt2web/vnt.sh", "/usr/share/vnt2web/vnt.sh", 0o644),
-    ("files/usr/share/vnt2web/vnt-core.sh", "/usr/share/vnt2web/vnt-core.sh", 0o644),
+    ("root/etc/init.d/vnt2web", "/etc/init.d/vnt2web", 0o755),
+    ("root/etc/config/vnt2web", "/etc/config/vnt2web", 0o644),
+    ("root/etc/uci-defaults/95-vnt2web", "/etc/uci-defaults/95-vnt2web", 0o755),
+    ("root/usr/share/vnt2web/vnt.sh", "/usr/share/vnt2web/vnt.sh", 0o644),
+    ("root/usr/share/vnt2web/vnt-core.sh", "/usr/share/vnt2web/vnt-core.sh", 0o644),
     # rpcd 后端：shell 插件机制（/usr/libexec/rpcd/），需可执行权限
-    ("files/usr/libexec/rpcd/vnt2web", "/usr/libexec/rpcd/vnt2web", 0o755),
-    ("files/usr/share/rpcd/acl.d/luci-app-vnt2web.json",
+    ("root/usr/libexec/rpcd/vnt2web", "/usr/libexec/rpcd/vnt2web", 0o755),
+    ("root/usr/share/rpcd/acl.d/luci-app-vnt2web.json",
      "/usr/share/rpcd/acl.d/luci-app-vnt2web.json", 0o644),
-    ("files/usr/share/luci/menu.d/luci-app-vnt2web.json",
+    ("root/usr/share/luci/menu.d/luci-app-vnt2web.json",
      "/usr/share/luci/menu.d/luci-app-vnt2web.json", 0o644),
     ("htdocs/luci-static/resources/view/vnt2web/client.js",
      "/www/luci-static/resources/view/vnt2web/client.js", 0o644),
@@ -165,7 +167,7 @@ def main():
             "Maintainer": "VirKing <https://github.com/virkingz>",
             "License": "MIT",
             "Description": "VNT 组网（Web 版）：把 vnt2_web 封装成 OpenWrt 服务与 LuCI 界面，"
-                           "可设置监听端口与绑定地址、管理访问令牌，并按架构在线下载与更新核心。"
+                           "可设置监听端口与访问令牌，并按架构在线下载与更新核心。"
                            "组网的添加与启停由 vnt2_web 自带网页完成，支持镜像/代理加速下载。",
         },
         out_path=out,

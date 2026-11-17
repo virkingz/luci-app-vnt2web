@@ -4,7 +4,7 @@
 
 1. **不做重复的轮子**。OpenWrt 已有 procd、UCI、LuCI、rpcd，
    插件就用这些，自己只写「vnt 特有的」那部分。
-2. **逻辑集中在 shell 库**。`files/usr/share/vnt2web/*.sh` 是唯一的事实来源；
+2. **逻辑集中在 shell 库**。`luci-app-vnt2web/root/usr/share/vnt2web/*.sh` 是唯一的事实来源；
    `rpcd` 后端与 `init.d` 脚本都调它，不各写一遍。
    这样加参数只需改一处。
 3. **不依赖编译**。插件是纯脚本 + 前端资源（`PKGARCH=all`），
@@ -29,12 +29,12 @@
 
 | 文件 | 职责 |
 |------|------|
-| `files/usr/share/vnt2web/vnt.sh` | 基础层：路径、日志、架构映射、HTTP 客户端、版本查询、镜像与代理 |
-| `files/usr/share/vnt2web/vnt-core.sh` | 核心层：下载/安装/回滚、UCI→参数翻译、进程状态、防火墙 |
-| `files/etc/init.d/vnt2web` | procd 服务 + 扩展子命令（status/diag/check_update/update_core/log） |
-| `files/etc/config/vnt2web` | UCI 默认值与字段文档（本身就是配置说明） |
-| `files/usr/libexec/rpcd/vnt2web` | LuCI 后端（rpcd shell 插件），暴露 ubus 对象 `vnt2web`；只做参数校验与 JSON 编解码 |
-| `htdocs/.../view/vnt2web/client.js` | LuCI 前端界面 |
+| `luci-app-vnt2web/root/usr/share/vnt2web/vnt.sh` | 基础层：路径、日志、架构映射、HTTP 客户端、版本查询、镜像与代理 |
+| `luci-app-vnt2web/root/usr/share/vnt2web/vnt-core.sh` | 核心层：下载/安装/回滚、UCI→参数翻译、进程状态、防火墙 |
+| `luci-app-vnt2web/root/etc/init.d/vnt2web` | procd 服务 + 扩展子命令（status/diag/check_update/update_core/log） |
+| `luci-app-vnt2web/root/etc/config/vnt2web` | UCI 默认值与字段文档（本身就是配置说明） |
+| `luci-app-vnt2web/root/usr/libexec/rpcd/vnt2web` | LuCI 后端（rpcd shell 插件），暴露 ubus 对象 `vnt2web`；只做参数校验与 JSON 编解码 |
+| `luci-app-vnt2web/htdocs/.../view/vnt2web/client.js` | LuCI 前端界面 |
 | `scripts/ipk.py` | ipk 组装器（纯 Python，含 ar + tar.gz） |
 | `scripts/build-ipk.py` | 打包驱动：收集文件、生成 control、调 ipk.py |
 | `scripts/test.py` | 本地测试，124 项 |
@@ -43,10 +43,10 @@
 
 以新增参数「`--foo-bar`」为例：
 
-1. `files/etc/config/vnt2web`：加一行 `option foo_bar ''`（写清注释）
-2. `files/usr/share/vnt2web/vnt-core.sh` 的 `vnt_build_args`：
+1. `luci-app-vnt2web/root/etc/config/vnt2web`：加一行 `option foo_bar ''`（写清注释）
+2. `luci-app-vnt2web/root/usr/share/vnt2web/vnt-core.sh` 的 `vnt_build_args`：
    加 `v="$(vnt_uci_get foo_bar '')"; [ -n "$v" ] && args="$args --foo-bar $v"`
-3. `htdocs/.../client.js`：加一个 `s.option(form.Value, 'foo_bar', ...)`
+3. `luci-app-vnt2web/htdocs/.../client.js`：加一个 `s.option(form.Value, 'foo_bar', ...)`
 4. `scripts/test.py` 的 `test_args`：加一条断言
 
 布尔开关同理，但取值判断用 `[ "$(vnt_uci_get foo_bar 0)" = "1" ]`。

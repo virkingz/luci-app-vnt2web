@@ -1,0 +1,85 @@
+name: build-sdk
+
+# 用 OpenWrt SDK 做真实编译（多架构矩阵），产出与官方 feed 编译等价的 ipk。
+#
+# 与 build.yml 的分工：
+#   build.yml      —— 免 SDK 自建 ipk（PKGARCH=all，一份包通吃全架构），
+#                     每次 push 与打 tag 都跑，快。
+#   build-sdk.yml  —— 本文件。走 feeds + SDK 的标准编译路径，
+#                     用于验证「能被 OpenWrt 正常编译」，并按 arch 出多份包。
+#
+# 矩阵编译较慢，所以只在手动触发或打 tag 时运行。
+on:
+  workflow_dispatch:
+  push:
+    tags: [ 'v*' ]
+
+permissions:
+  contents: read
+
+env:
+  PKGDIR: luci-app-vnt2web
+
+jobs:
+  # 先用 buildroot 的 rules.mk 做一次语法层面的 Makefile 校验（很快）
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 检查 feed 结构
+        run: |
+          test -f "$PKGDIR/Makefile" || { echo "缺 $PKGDIR/Makefile"; exit 1; }
+          echo "== Makefile 关键字段"
+          grep -E '^(PKG_NAME|PKG_VERSION|PKG_RELEASE|PKGARCH):=' "$PKGDIR/Makefile"
+          echo "== 必需目录"
+          for d in files htdocs; do
+            test -d "$PKGDIR/$d" || { echo "缺目录 $PKGDIR/$d"; exit 1; }
+          done
+          echo "结构检查通过"
+
+  build:
+    needs: lint
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 覆盖常见目标平台（与 vnt 官方预编译包对应的架构）
+        arch:
+          - x86_64
+          - aarch64_cortex-a53
+          - aarch64_generic
+          - arm_cortex-a7_neon-vfpv4
+          - arm_cortex-a9
+          - mipsel_24kc
+        sdk:
+          - openwrt-23.05
+          - openwrt-24.10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 用 SDK 编译
+        uses: sbwml/openwrt-gh-action-sdk@main
+        env:
+          ARCH: ${{ matrix.arch }}-${{ matrix.sdk }}
+          FEEDNAME: vnt2web
+          PACKAGES: luci-app-vnt2web
+          NO_REFRESH_CHECK: true
+          V: s
+
+      - name: 收集产物
+        if: always()
+        run: |
+          mkdir -p out
+          find . -name 'luci-app-vnt2web*.ipk' -not -path './out/*' \
+            -exec cp -v {} out/ \; 2>/dev/null || true
+          ls -l out/ || echo "（本次未产出 ipk）"
+
+      - name: 上传产物
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ipk-${{ matrix.arch }}-${{ matrix.sdk }}
+          path: out/*.ipk
+          if-no-files-found: warn

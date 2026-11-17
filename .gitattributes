@@ -16,15 +16,21 @@
 *.yml   text eol=lf
 *.yaml  text eol=lf
 
-# 无后缀的脚本与配置（OpenWrt 惯例）—— 必须 LF
-files/etc/init.d/*           text eol=lf
-files/etc/uci-defaults/*     text eol=lf
-files/etc/config/*           text eol=lf
-files/usr/libexec/rpcd/*     text eol=lf
-files/usr/share/vnt2web/*    text eol=lf
-files/usr/share/luci/menu.d/* text eol=lf
-files/usr/share/rpcd/acl.d/* text eol=lf
-Makefile                     text eol=lf
+# 无后缀的脚本与配置（OpenWrt 惯例，位于包目录的 root/ 下）—— 必须 LF
+luci-app-vnt2web/root/etc/init.d/*            text eol=lf
+luci-app-vnt2web/root/etc/uci-defaults/*      text eol=lf
+luci-app-vnt2web/root/etc/config/*            text eol=lf
+luci-app-vnt2web/root/usr/libexec/rpcd/*      text eol=lf
+luci-app-vnt2web/root/usr/share/vnt2web/*     text eol=lf
+luci-app-vnt2web/root/usr/share/luci/menu.d/* text eol=lf
+luci-app-vnt2web/root/usr/share/rpcd/acl.d/*  text eol=lf
+
+# 兜底：任何 root/ 下的文件都按 LF（万一以后新增无后缀脚本忘了声明）
+root/**                text eol=lf
+
+# Makefile 必须 LF（行尾的 \r 会破坏续行）
+Makefile               text eol=lf
+**/Makefile            text eol=lf
 
 # 二进制文件不做任何转换
 *.ipk   binary

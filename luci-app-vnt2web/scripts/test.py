@@ -62,8 +62,8 @@ def sh(script, env=None):
         e.update(env)
     prelude = (
         'VNT_ETC="%s/vntetc"; VNT_LOG_DIR="%s/vntlog"; VNT_CACHE_DIR="%s/vntcache"; '
-        '. "%s/files/usr/share/vnt2web/vnt.sh"; '
-        '. "%s/files/usr/share/vnt2web/vnt-core.sh"; '
+        '. "%s/root/usr/share/vnt2web/vnt.sh"; '
+        '. "%s/root/usr/share/vnt2web/vnt-core.sh"; '
     ) % (e.get("TMPD", "/tmp"), e.get("TMPD", "/tmp"), e.get("TMPD", "/tmp"), ROOT, ROOT)
     r = subprocess.run(["sh", "-c", prelude + script],
                        capture_output=True, text=True, env=e)
@@ -278,7 +278,7 @@ def test_token_and_addr():
     check("默认 config 常量", sh_("printf '%s' \"$VNT_CFG_DEFAULT\""),
           "/etc/vnt2web/config")
     # 日志默认值在源码里是 /tmp/vnt2web（被 prelude 覆盖，故查源文件）
-    lib_src = open(os.path.join(ROOT, "files/usr/share/vnt2web/vnt.sh"),
+    lib_src = open(os.path.join(ROOT, "root/usr/share/vnt2web/vnt.sh"),
                    encoding="utf-8").read()
     check_true("源码中日志默认值为 /tmp/vnt2web",
                'VNT_LOG_DIR="${VNT_LOG_DIR:-/tmp/vnt2web}"' in lib_src, "")
@@ -436,7 +436,7 @@ def test_against_official():
 def test_rpcd_backend():
     section("5c. rpcd 后端协议")
 
-    plugin = os.path.join(ROOT, "files/usr/libexec/rpcd/vnt2web")
+    plugin = os.path.join(ROOT, "root/usr/libexec/rpcd/vnt2web")
     if not os.path.exists(plugin):
         check_true("rpcd 后端存在", False, plugin)
         return
@@ -455,7 +455,7 @@ def test_rpcd_backend():
 
     # ---- list ----
     env = dict(os.environ)
-    env["VNT_LIB_DIR"] = os.path.join(ROOT, "files/usr/share/vnt2web")
+    env["VNT_LIB_DIR"] = os.path.join(ROOT, "root/usr/share/vnt2web")
     r = subprocess.run(["sh", plugin, "list"], capture_output=True, text=True, env=env)
     check_true("list 退出码 0", r.returncode == 0, r.stderr.strip())
     try:
@@ -490,7 +490,7 @@ def test_rpcd_backend():
 
         env2 = dict(os.environ)
         env2["PATH"] = stub + os.pathsep + env2.get("PATH", "")
-        env2["VNT_LIB_DIR"] = os.path.join(ROOT, "files/usr/share/vnt2web")
+        env2["VNT_LIB_DIR"] = os.path.join(ROOT, "root/usr/share/vnt2web")
         env2["VNT_ETC"] = os.path.join(tmpd, "etc")
         env2["VNT_LOG_DIR"] = os.path.join(tmpd, "log")
         env2["VNT_CACHE_DIR"] = os.path.join(tmpd, "cache")
@@ -604,18 +604,18 @@ def test_static():
     section("6. 静态检查")
 
     # shell 语法
-    for rel in ["files/usr/share/vnt2web/vnt.sh",
-                "files/usr/share/vnt2web/vnt-core.sh",
-                "files/etc/init.d/vnt2web",
-                "files/etc/uci-defaults/95-vnt2web"]:
+    for rel in ["root/usr/share/vnt2web/vnt.sh",
+                "root/usr/share/vnt2web/vnt-core.sh",
+                "root/etc/init.d/vnt2web",
+                "root/etc/uci-defaults/95-vnt2web"]:
         p = os.path.join(ROOT, rel)
         r = subprocess.run(["sh", "-n", p], capture_output=True, text=True)
         check_true("sh -n %s" % rel, r.returncode == 0, r.stderr.strip())
 
     # JSON 合法性
     import json
-    for rel in ["files/usr/share/rpcd/acl.d/luci-app-vnt2web.json",
-                "files/usr/share/luci/menu.d/luci-app-vnt2web.json"]:
+    for rel in ["root/usr/share/rpcd/acl.d/luci-app-vnt2web.json",
+                "root/usr/share/luci/menu.d/luci-app-vnt2web.json"]:
         try:
             json.load(open(os.path.join(ROOT, rel), encoding="utf-8"))
             check_true("JSON %s" % rel, True)
@@ -624,11 +624,11 @@ def test_static():
 
     # 库函数引用完整性：init 脚本调用的 vnt_* 必须在库里或自身有定义
     defs = set()
-    for rel in ["files/usr/share/vnt2web/vnt.sh", "files/usr/share/vnt2web/vnt-core.sh",
-                "files/etc/init.d/vnt2web"]:
+    for rel in ["root/usr/share/vnt2web/vnt.sh", "root/usr/share/vnt2web/vnt-core.sh",
+                "root/etc/init.d/vnt2web"]:
         src = open(os.path.join(ROOT, rel), encoding="utf-8").read()
         defs |= set(re.findall(r"^(vnt_[a-z_]+|_vnt_[a-z_]+)\(\)", src, re.M))
-    init_src = open(os.path.join(ROOT, "files/etc/init.d/vnt2web"), encoding="utf-8").read()
+    init_src = open(os.path.join(ROOT, "root/etc/init.d/vnt2web"), encoding="utf-8").read()
     # 只匹配「函数调用」形式（标识符后紧跟括号），避免把注释里的
     # vnt_config 之类的词误当成函数。同时先剥掉注释行。
     init_code = re.sub(r"^[ \t]*#.*$", "", init_src, flags=re.M)
@@ -637,7 +637,7 @@ def test_static():
     check_true("init 脚本引用的库函数均已定义", not missing, "缺: " + ", ".join(missing))
 
     # rpcd shell 后端引用的库函数同样要有定义
-    _be = os.path.join(ROOT, "files/usr/libexec/rpcd/vnt2web")
+    _be = os.path.join(ROOT, "root/usr/libexec/rpcd/vnt2web")
     if os.path.exists(_be):
         be = open(_be, encoding="utf-8").read()
         be_used = set(re.findall(r"\b(vnt_[a-z_]+)\(", be))
@@ -645,7 +645,7 @@ def test_static():
         check_true("rpcd 后端引用的库函数均已定义", not be_missing,
                    "缺: " + ", ".join(be_missing))
     check_true("已移除 ucode 后端",
-               not os.path.exists(os.path.join(ROOT, "files/usr/share/rpcd/ucode")), "")
+               not os.path.exists(os.path.join(ROOT, "root/usr/share/rpcd/ucode")), "")
 
     # ---- 运行状态检测 ----
     # 这组断言对应两个真实故障：
@@ -653,11 +653,11 @@ def test_static():
     #   (b) 用 `pgrep -f <裸名字>` 检测进程 → 会命中检测脚本自身
     #       （rpcd 执行 /usr/libexec/rpcd/vnt2web，命令行含 "vnt2web"），
     #       导致恒真 → 「没启用却显示已启动」
-    init_full = open(os.path.join(ROOT, "files/etc/init.d/vnt2web"),
+    init_full = open(os.path.join(ROOT, "root/etc/init.d/vnt2web"),
                      encoding="utf-8").read()
-    core_full = open(os.path.join(ROOT, "files/usr/share/vnt2web/vnt-core.sh"),
+    core_full = open(os.path.join(ROOT, "root/usr/share/vnt2web/vnt-core.sh"),
                      encoding="utf-8").read()
-    lib_full = open(os.path.join(ROOT, "files/usr/share/vnt2web/vnt.sh"),
+    lib_full = open(os.path.join(ROOT, "root/usr/share/vnt2web/vnt.sh"),
                     encoding="utf-8").read()
 
     check_true("init 让 procd 写 PID 文件",
@@ -729,14 +729,14 @@ def test_static():
     # 不应残留未定义的标识符
     for bad in ["view_self", "vnt_fetch_text_probe"]:
         check_true("JS 无残留 %s" % bad, bad not in js)
-        uc_src2 = open(os.path.join(ROOT, "files/usr/libexec/rpcd/vnt2web"),
+        uc_src2 = open(os.path.join(ROOT, "root/usr/libexec/rpcd/vnt2web"),
                        encoding="utf-8").read()
         check_true("后端无残留 %s" % bad, bad not in uc_src2)
 
     # 前端声明的每个 RPC 方法，后端都必须实现
     # 前端声明的每个 RPC 方法，后端都必须实现
     rpc_methods = set(re.findall(r"method:\s*'([a-z_]+)'", js))
-    be_src = open(os.path.join(ROOT, "files/usr/libexec/rpcd/vnt2web"),
+    be_src = open(os.path.join(ROOT, "root/usr/libexec/rpcd/vnt2web"),
                   encoding="utf-8").read()
     for meth in sorted(rpc_methods):
         check_true("后端实现 %s" % meth,
@@ -760,7 +760,7 @@ def test_static():
     check_true("无残留的 'vnt' 配置名", not stray, str(stray))
 
     # UCI 配置文件必须定义与前端一致的节名与类型
-    cfg = open(os.path.join(ROOT, "files/etc/config/vnt2web"), encoding="utf-8").read()
+    cfg = open(os.path.join(ROOT, "root/etc/config/vnt2web"), encoding="utf-8").read()
     m0 = re.search(r"^config\s+(\S+)\s+'(\S+)'", cfg, re.M)
     check_true("配置文件含 config 节", bool(m0), "")
     if m0:
@@ -969,7 +969,7 @@ def test_frontend_reorder():
                not in js, "")
 
     # ---- 菜单：放到 VPN 分类，标题 VNT2WEB ----
-    menu_path = os.path.join(ROOT, "files/usr/share/luci/menu.d/luci-app-vnt2web.json")
+    menu_path = os.path.join(ROOT, "root/usr/share/luci/menu.d/luci-app-vnt2web.json")
     menu = json.load(open(menu_path, encoding="utf-8"))
     check_true("菜单挂在 admin/vpn 下", "admin/vpn/vnt2web" in menu,
                str(list(menu.keys())))
