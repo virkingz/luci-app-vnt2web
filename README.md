@@ -186,7 +186,7 @@ luci-app-vnt2web/                     # 仓库根 = feed
 ├── .github/workflows/
 │   ├── build.yml                     # 免 SDK 自建 ipk + 测试（快）
 │   └── build-sdk.yml                 # SDK 矩阵真实编译（可选）
-├── docs/screenshots/                 # 界面截图
+├── docs/screenshots/                 # 界面截图（仅供 README 展示）
 ├── LICENSE                           # MIT
 └── luci-app-vnt2web/                 # ← 包本体
     ├── Makefile                      # OpenWrt 包定义（用 feeds/luci/luci.mk）
