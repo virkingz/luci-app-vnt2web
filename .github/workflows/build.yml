@@ -34,8 +34,8 @@ jobs:
       - name: shell 语法检查
         run: |
           cd "$PKGDIR"
-          for f in files/usr/share/vnt2web/vnt.sh files/usr/share/vnt2web/vnt-core.sh \
-                   files/etc/init.d/vnt2web files/etc/uci-defaults/95-vnt2web \
+          for f in root/usr/share/vnt2web/vnt.sh root/usr/share/vnt2web/vnt-core.sh \
+                   root/etc/init.d/vnt2web root/etc/uci-defaults/95-vnt2web \
                    scripts/build-ipk.sh; do
             echo "== $f"
             sh -n "$f"
@@ -45,8 +45,8 @@ jobs:
         continue-on-error: true
         run: |
           cd "$PKGDIR"
-          shellcheck -s sh -e SC3043,SC2039 files/usr/share/vnt2web/*.sh \
-            files/etc/init.d/vnt2web files/etc/uci-defaults/95-vnt2web || true
+          shellcheck -s sh -e SC3043,SC2039 root/usr/share/vnt2web/*.sh \
+            root/etc/init.d/vnt2web root/etc/uci-defaults/95-vnt2web || true
 
       - name: 打包（免 SDK 自建 ipk）
         run: |
